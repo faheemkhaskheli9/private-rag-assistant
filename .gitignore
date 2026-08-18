@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+*.egg-info/
+build/
+dist/
+
+# Data & models
+*.csv
+*.parquet
+data/raw/
+data/processed/
+models/*.pt
+models/*.onnx
+models/*.engine
+*.ckpt
+
+# Notebooks
+.ipynb_checkpoints/
+
+# OS/IDE
+.DS_Store
+.idea/
+.vscode/
+
+# Docker
+*.log

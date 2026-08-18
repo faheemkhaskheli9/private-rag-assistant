@@ -1,0 +1,5 @@
+[project]
+name = "private-rag-assistant"
+version = "0.1.0"
+description = "Private GPT with RAG"
+requires-python = ">=3.10"
