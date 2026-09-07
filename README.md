@@ -4,7 +4,7 @@
 > This is an original, from-scratch build. It is not affiliated with, and does not
 > contain any code, prompts, data, or business logic from, any employer or client.
 
-![status](https://img.shields.io/badge/status-planned-lightgrey)
+![status](https://img.shields.io/badge/status-phase%201%20in%20progress-yellow)
 ![python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![license](https://img.shields.io/badge/license-MIT-green)
 
@@ -95,11 +95,23 @@ No proprietary, employer-owned, or client-identifiable data is used in this proj
 
 ## 9. Training / Execution
 
-Document the commands used to run training, ingestion, or the main pipeline, e.g.:
+Phase 1 ships the ingestion entrypoints (PDF upload + metadata index). No API
+key or model is required.
 
 ```bash
-python -m src.main --config configs/default.yaml
+pip install -r requirements.txt
+
+# HTTP API
+PYTHONPATH=src uvicorn prag.api:app --reload
+curl -s -F 'file=@examples/sample.pdf' localhost:8000/documents/upload
+
+# CLI
+PYTHONPATH=src python -m prag.cli upload examples/sample.pdf
+PYTHONPATH=src python -m prag.cli list
 ```
+
+VS Code: **PRAG: FastAPI (uvicorn)**, **PRAG: CLI (upload)**, **PRAG: pytest**
+in `.vscode/launch.json`.
 
 ## 10. Evaluation
 
