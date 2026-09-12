@@ -12,6 +12,10 @@ import os
 from dataclasses import dataclass, replace
 from pathlib import Path
 
+import yaml
+
+from .chunking import ChunkConfig
+
 _DEFAULT_MAX_UPLOAD_BYTES = 25 * 1024 * 1024  # 25 MiB
 
 
@@ -19,10 +23,22 @@ _DEFAULT_MAX_UPLOAD_BYTES = 25 * 1024 * 1024  # 25 MiB
 class Settings:
     storage_dir: Path = Path("data/store")
     max_upload_bytes: int = _DEFAULT_MAX_UPLOAD_BYTES
+    chunk_size: int = 800
+    chunk_overlap: int = 100
+    splitter: str = "fixed"
+
+    def __post_init__(self) -> None:
+        # Reuses ChunkConfig's validation so "overlap >= chunk_size" and an
+        # unknown splitter name fail with the same clear error whether they
+        # came from a config file or a direct Settings() call.
+        ChunkConfig(self.chunk_size, self.chunk_overlap, self.splitter)
 
     def with_overrides(self, **kwargs: object) -> "Settings":
         clean = {k: v for k, v in kwargs.items() if v is not None}
         return replace(self, **clean)  # type: ignore[arg-type]
+
+    def chunking(self) -> ChunkConfig:
+        return ChunkConfig(self.chunk_size, self.chunk_overlap, self.splitter)
 
 
 def _coerce(raw: dict[str, object]) -> Settings:
@@ -33,9 +49,15 @@ def _coerce(raw: dict[str, object]) -> Settings:
         max_upload = int(max_upload)
         if max_upload <= 0:
             raise ValueError("max_upload_bytes must be positive")
+    chunk_size = raw.get("chunk_size")
+    chunk_overlap = raw.get("chunk_overlap")
+    splitter = raw.get("splitter")
     return base.with_overrides(
         storage_dir=Path(storage_dir) if storage_dir is not None else None,
         max_upload_bytes=max_upload,
+        chunk_size=int(chunk_size) if chunk_size is not None else None,
+        chunk_overlap=int(chunk_overlap) if chunk_overlap is not None else None,
+        splitter=splitter,
     )
 
 
@@ -43,7 +65,8 @@ def load_settings(config_path: str | os.PathLike[str] | None = None) -> Settings
     """Load settings.
 
     * ``config_path`` given but missing -> :class:`FileNotFoundError`.
-    * ``config_path`` given and present -> parsed (JSON).
+    * ``config_path`` given and present -> parsed as YAML (``.yaml``/``.yml``)
+      or JSON otherwise.
     * ``config_path`` omitted -> env overrides on top of built-in defaults.
     """
 
@@ -51,9 +74,10 @@ def load_settings(config_path: str | os.PathLike[str] | None = None) -> Settings
         path = Path(config_path)
         if not path.is_file():
             raise FileNotFoundError(f"config file not found: {path}")
-        raw = json.loads(path.read_text(encoding="utf-8"))
+        text = path.read_text(encoding="utf-8")
+        raw = yaml.safe_load(text) if path.suffix in (".yaml", ".yml") else json.loads(text)
         if not isinstance(raw, dict):
-            raise ValueError("config file must contain a JSON object")
+            raise ValueError("config file must contain a mapping/object at the top level")
         return _coerce(raw)
 
     env: dict[str, object] = {}
@@ -61,4 +85,10 @@ def load_settings(config_path: str | os.PathLike[str] | None = None) -> Settings
         env["storage_dir"] = os.environ["PRAG_STORAGE_DIR"]
     if "PRAG_MAX_UPLOAD_BYTES" in os.environ:
         env["max_upload_bytes"] = os.environ["PRAG_MAX_UPLOAD_BYTES"]
+    if "PRAG_CHUNK_SIZE" in os.environ:
+        env["chunk_size"] = os.environ["PRAG_CHUNK_SIZE"]
+    if "PRAG_CHUNK_OVERLAP" in os.environ:
+        env["chunk_overlap"] = os.environ["PRAG_CHUNK_OVERLAP"]
+    if "PRAG_SPLITTER" in os.environ:
+        env["splitter"] = os.environ["PRAG_SPLITTER"]
     return _coerce(env)

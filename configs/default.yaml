@@ -1,0 +1,14 @@
+# Default ingestion settings. Pass this file's path to `load_settings()` (or
+# `prag --config configs/default.yaml`) to use it explicitly; omitting a
+# config path falls back to these same values via built-in defaults, with
+# PRAG_* env vars able to override individual fields.
+
+storage_dir: data/store
+max_upload_bytes: 26214400  # 25 MiB
+
+# Chunking strategy (see src/prag/chunking.py):
+#   splitter: fixed     -- fixed-size sliding window, ignores content boundaries
+#   splitter: recursive -- packs paragraph/sentence units up to chunk_size
+chunk_size: 800
+chunk_overlap: 100
+splitter: fixed
