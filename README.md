@@ -113,6 +113,26 @@ PYTHONPATH=src python -m prag.cli list
 VS Code: **PRAG: FastAPI (uvicorn)**, **PRAG: CLI (upload)**, **PRAG: pytest**
 in `.vscode/launch.json`.
 
+Every chunk produced during ingestion carries citation-ready metadata
+(`prag.chunking.ChunkRecord`): `document_id`, 1-indexed `page_number`, and a
+`(start_offset, end_offset)` character range into that page's own extracted
+text — so a later answer can cite the exact source location, not just "this
+document". Offsets are the single source of truth `chunk_text` builds on
+(`chunk_text_with_offsets`), so the plain-text and metadata-tagged chunking
+paths can never drift apart:
+
+```python
+from prag.chunking import ChunkConfig, chunk_pages_with_metadata, extract_pdf_pages
+
+pages = extract_pdf_pages(pdf_bytes)
+records = chunk_pages_with_metadata("doc-1", pages, ChunkConfig())
+# ChunkRecord(document_id='doc-1', page_number=2, text='...', start_offset=0, end_offset=612)
+```
+
+A malformed/unreadable PDF (multi-column layouts pypdf can't extract, or a
+corrupt file) logs a warning and yields no pages/chunks rather than crashing
+the ingestion pipeline — see `extract_pdf_pages`.
+
 ## 10. Evaluation
 
 Document evaluation metrics and how to reproduce them here (see `docs/evaluation.md`).
