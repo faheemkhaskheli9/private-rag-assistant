@@ -232,3 +232,54 @@ def test_chunk_pages_with_metadata_handles_malformed_pdf_gracefully():
     # warning, no crash); chunking that empty page list must not crash either.
     pages = extract_pdf_pages(b"not a pdf at all")
     assert chunk_pages_with_metadata("doc-4", pages, ChunkConfig()) == []
+
+
+# --- exact known chunk counts / boundaries (issue #4 regression coverage) --
+#
+# The tests above check relative properties (counts differ between
+# splitters, overlap holds between the *first* pair). These pin down an
+# exact, hand-computed expected chunk count and boundary list for a known
+# input, and check overlap across *every* consecutive pair -- so a future
+# off-by-one in the fixed-window step calculation fails here with the exact
+# expected vs. actual boundaries, not just "some count changed".
+
+
+def _digits(n: int) -> str:
+    """`n` deterministic characters ("0123456789012...") -- easy to eyeball
+    slice boundaries against by hand."""
+    return "".join(str(i % 10) for i in range(n))
+
+
+def test_fixed_splitter_exact_chunk_count_and_boundaries_for_known_input():
+    text = _digits(50)
+    config = ChunkConfig(chunk_size=10, chunk_overlap=3, splitter="fixed")
+    chunks = chunk_text_with_offsets(text, config)
+
+    # Hand-computed: step = 10 - 3 = 7; starts 0,7,14,21,28,35,42 (42+10=52
+    # clamps to the text's 50 chars, and the loop stops once a chunk reaches
+    # the end) -- 7 chunks total.
+    expected_starts = [0, 7, 14, 21, 28, 35, 42]
+    assert [start for _, start, _ in chunks] == expected_starts, (
+        f"expected fixed-window starts {expected_starts}, "
+        f"got {[start for _, start, _ in chunks]}"
+    )
+    assert len(chunks) == 7
+    assert chunks[-1][2] == len(text)  # last chunk's end reaches the text end
+    for chunk, start, end in chunks:
+        assert text[start:end] == chunk
+
+
+def test_fixed_splitter_overlap_is_exact_between_every_consecutive_pair():
+    text = _digits(200)
+    config = ChunkConfig(chunk_size=30, chunk_overlap=8, splitter="fixed")
+    chunks = chunk_text(text, config)
+
+    assert len(chunks) > 2, "need >2 chunks so this isn't only checking the first pair"
+    for i, (prev_chunk, next_chunk) in enumerate(zip(chunks, chunks[1:])):
+        assert prev_chunk[-config.chunk_overlap :] == next_chunk[: config.chunk_overlap], (
+            f"overlap broken between chunk {i} and {i + 1}: "
+            f"tail={prev_chunk[-config.chunk_overlap:]!r} "
+            f"head={next_chunk[:config.chunk_overlap]!r}"
+        )
+
+
