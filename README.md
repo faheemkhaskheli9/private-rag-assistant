@@ -104,6 +104,8 @@ pip install -r requirements.txt
 # HTTP API
 PYTHONPATH=src uvicorn prag.api:app --reload
 curl -s -F 'file=@examples/sample.pdf' localhost:8000/documents/upload
+# one or more PDFs in a single request (repeat the `files` field)
+curl -s -F 'files=@first.pdf' -F 'files=@second.pdf' localhost:8000/documents
 
 # CLI
 PYTHONPATH=src python -m prag.cli upload examples/sample.pdf
@@ -112,6 +114,17 @@ PYTHONPATH=src python -m prag.cli list
 
 VS Code: **PRAG: FastAPI (uvicorn)**, **PRAG: CLI (upload)**, **PRAG: pytest**
 in `.vscode/launch.json`.
+
+`POST /documents` validates each file independently (`%PDF-` magic bytes +
+`.pdf` name, `PRAG_MAX_UPLOAD_BYTES`) and reports a per-file outcome:
+`{"uploaded": [...], "rejected": [{"filename", "status", "detail"}]}` with
+`201` when every file was stored, `207` when some were rejected, and a `4xx`
+when none were — a bad file never silently disappears from a batch. Document
+ids are a hash of the file's bytes, so re-uploading the same PDF returns the
+same id. Uploads are read in bounded chunks and abandoned as soon as they pass
+the size limit, so the limit caps memory as well as disk; a request may carry
+at most `PRAG_MAX_FILES_PER_UPLOAD` files (default 20). Files are stored under
+`PRAG_STORAGE_DIR` (default `data/store`).
 
 Every chunk produced during ingestion carries citation-ready metadata
 (`prag.chunking.ChunkRecord`): `document_id`, 1-indexed `page_number`, and a

@@ -29,10 +29,15 @@ class NotPdfError(ValueError):
 
 
 class UploadTooLargeError(ValueError):
-    def __init__(self, size: int, limit: int) -> None:
-        super().__init__(f"upload is {size} bytes; limit is {limit}")
+    """``at_least=True`` means reading stopped as soon as the limit was
+    passed, so ``size`` is a lower bound rather than the full upload size."""
+
+    def __init__(self, size: int, limit: int, *, at_least: bool = False) -> None:
+        qualifier = "at least " if at_least else ""
+        super().__init__(f"upload is {qualifier}{size} bytes; limit is {limit}")
         self.size = size
         self.limit = limit
+        self.at_least = at_least
 
 
 @dataclass(frozen=True)
